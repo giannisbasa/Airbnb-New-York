@@ -1,0 +1,308 @@
+---
+title: "Airbnb New York"
+---
+
+Για τον σκοπό της παρούσας εργασίας έχει επιλεγεί αρχείο της μορφής csv το οποίο ανασύρθηκε από την ιστοσελίδα Inside Airbnb και το οποίο περιέχει στοιχεία για τις κρατήσεις στη γνωστή ιστοσελίδα βραχυχρόνιας μίσθωσης Airbnb στην περιοχή της Νέας Υόρκης. Επίσης, για την κατασκευή θεματικού χάρτη για την περιοχή της Νέας Υόρκης, ανασύρθηκε αρχείο της μορφής shapefile από την ιστοσελίδα NYC OpenData.
+
+Στη συνέχεια ακολουθεί ο κώδικας μέσω του οποίου πραγματοποιείται η στατιστική ανάλυση και η δημιουργία θεματικού χάρτη. Τα δεδομένα του αρχείου csv χρησιμοποιούνται για να γίνει στατιστική ανάλυση και απεικόνιση βασικών γραφικών παραστάσεων για πιο ευανάγνωστη μορφή του αποτελέσματος. Έπειτα, κάνοντας χρήση του αρχείου shapefile πραγματοποιείται χαρτογράφηση της περιοχής της Νέας Υόρκης και παρουσιάζονται πάνω σε αυτά στατιστικά στοιχεία. 
+
+
+# LOAD LIBRARIES
+```{r message=FALSE, warning=FALSE, paged.print=FALSE}
+library(ggplot2)
+library(ggmap)
+library(dplyr)
+library(sp)
+library(maptools)
+library(rgeos)
+library(rgdal)
+library(ggpubr)
+library(grid)
+library(leaflet)
+library(tmap)
+library(RColorBrewer)
+library(lctools)
+library(stringi)
+library(dplyr)
+```
+
+# DATA ANALYSIS
+
+## Read the data table
+```{r warning=FALSE}
+df = read.csv('listings.csv')
+```
+
+## Column names
+```{r warning=FALSE}
+names(df)
+```
+
+## Length of dataset
+```{r warning=FALSE}
+length(unique(df$id))
+```
+
+## Display the structure of the df
+```{r message=FALSE, warning=FALSE, paged.print=FALSE}
+# Display the structure of the df
+str(df)
+```
+
+
+## 1. No. of listings by neighborhood 
+```{r warning=FALSE}
+ggplot(df) + 
+  geom_histogram(aes(neighbourhood_group,fill=neighbourhood_group),
+stat = "count",alpha = 0.85)+
+  theme_minimal(base_size=13) + 
+  xlab("Neighbourhoods") + ylab("No. of Listings") +theme(legend.position="none") + 
+  ggtitle("The Number of Property in Each Area")
+
+df %>% ggplot(aes(x = longitude, y = latitude, 
+                  color= neighbourhood_group)) + 
+  geom_point(alpha = 0.4) 
+```
+
+#### ΑΝΑΛΥΣΗ
+
+Από το γραφική παράσταση είναι ξεκάθαρο ότι οι περιοχές με τις περισσότερες καταχωρήσεις είναι το Manhattan, και ακολουθεί το Brooklyn με ελάχιστα μικρότερο αριθμό καταχωρήσεων. Ο αριθμός των καταχωρήσεων στις υπόλοιπες περιοχές είναι πολύ κάτω από το μισό των καταχωρήσεων των προαναφερθέντων περιοχών, με την τελευταία από άποψη καταχωρήσεων στη συγκεκριμένη λίστα να είναι το Staten Island. 
+
+
+## 2. Room Type in Each Area 
+```{r warning=FALSE}
+ggplot(df) + geom_histogram(aes(room_type, fill = room_type), stat = "count",alpha = 0.85) + 
+  theme_minimal(base_size=13) + 
+  xlab("Room type") + ylab("No. of Listings")  + 
+  ggtitle("The Proportion of Room Type in Each Area")
+
+df %>% ggplot(aes(x = longitude, y = latitude, 
+                       color= room_type)) + 
+  geom_point(alpha = 0.4)
+```
+
+#### ΑΝΑΛΥΣΗ
+
+Στο γράφημα παρουσιάζεται ότι η πλειοψηφία των καταχωρήσεων είναι ολόκληρα σπίτια και ιδιωτικά δωμάτια. Επαλήθευση, των συμπερασμάτων αυτών  γίνεται με την προβολή των διαφόρων ειδών καταχωρήσεων πάνω στον χάρτη της Νέας Υόρκης και όπως είναι ξεκάθαρο και από τον χάρτη υπάρχει κατακλυσμός από κόκκινες και πράσινες κουκίδες, οι οποίες αντιστοιχούν σε ολόκληρα σπίτια και ιδιωτικά δωμάτια. 
+
+
+## 3. Combine the above graphs 
+```{r warning=FALSE}
+ggplot(df) + geom_histogram(aes(neighbourhood_group, fill = room_type), stat = "count",alpha = 0.85, position = 'fill') + 
+  theme_minimal(base_size=13) +
+  xlab("Neighbourhoods") + ylab("Proposion")  + 
+  ggtitle("The Proportion of Room Type in Each Area")
+```
+
+#### ΑΝΑΛΥΣΗ
+
+Στον χάρτη παρουσιάζεται το ποσοστό του κάθε είδους δωματίου σε κάθε περιοχή. Όπως έχει ήδη αναφερθεί και σε προηγούμενο γράφημα η πλειοψηφία των καταχωρήσεων είναι ολόκληρα σπίτια και ιδιωτικά δωμάτια. Επίσης, οι περιοχές με τις περισσότερες καταχωρήσεις είναι το Manhattan και το Brooklyn. Ακόμη, είναι σημαντικό να σημειωθεί ότι στις περιοχές που υπάρχουν οι περισσότερες καταχωρήσεις, δηλαδή το Manhattan και το Brooklyn, η πλειοψηφία των καταχωρήσεων και μάλιστα σε ποσοστό το οποίο είναι ίσο ή ξεπερνάει το 50%, είναι ολόκληρα σπίτια. Στις υπόλοιπες περιοχές όπου ο συνολικός αριθμός των καταχωρήσεων είναι μικρότερος από τις δύο προαναφερθείσες περιοχές, παρατηρείται ότι τα ιδιωτικά δωμάτια υπερέχουν σε αριθμό έναντι των ολόκληρων σπιτιών. Τέλος, άξιο αναφοράς είναι το μειωμένο ποσοστό των καταχωρήσεων που αντιστοιχούν στα ξενοδοχεία.       
+
+
+## 4. Top 10 neighborhoods by no. of listings 
+```{r warning=FALSE}
+n = table(df$neighbourhood)
+n = tail(sort(n, decreasing = FALSE), 10)
+barplot(n, main = 'Top 10 Neighbothoods',
+        horiz = TRUE,
+        xlab = 'No. of listings',
+        col = '#69b3a2', las = 2)
+```
+
+#### ΑΝΑΛΥΣΗ
+Στο ιστόγραμμα παρουσιάζονται με αύξουσα σειρά οι 10 γειτονιές με τις περισσότερες καταχωρήσεις.
+
+
+## 5. Price by room type 
+```{r warning=FALSE}
+ggplot(df, aes(x = room_type, y = price, 
+               col = room_type))+
+  geom_boxplot()+
+  scale_y_log10()
+```
+
+#### ΑΝΑΛΥΣΗ
+
+Στα θηκογράμματα γίνεται απεικόνιση κάθε είδους καταχώρησης σε συνάρτηση με τις τιμές αυτών. Τα δύο είδη δωματίων με τις περισσότερες καταχωρήσεις, ολόκληρο σπίτι και ιδιωτικό δωμάτιο, παρουσιάζουν μεγαλύτερο ποσοστό ακραίων τιμών σε σύγκριση με τις υπόλοιπες κατηγορίες δωματίων. Ακόμη, φαίνεται ότι οι τιμές για ενοικίαση ολόκληρου σπιτιού είναι ελαφρός μεγαλύτερη από ένα μονάχα δωμάτιο αλλά δεν είναι η κατηγορία με τις πιο υψηλές τιμές, αντιθέτως οι υψηλότερες τιμές παρατηρούνται στα δωμάτια ξενοδοχείου.
+Λόγω της ύπαρξης πολλών αποκλίνουσων τιμών, για τον κατακόρυφο άξονα έχει επιλεγεί λογαριθμική κλίμακα. Με αυτόν τον τρόπο επιτυγχάνεται η απεικόνιση ενός πιο ευδιάκριτου αποτελέσματος. Στο γράφημα φαίνεται επίσης ότι υπάρχουν και πολλές αρνητικές αποκλίνουσες τιμές. 
+    
+
+
+## 6. Distribution of Listing Price 
+```{r warning=FALSE}
+ggplot(df)+ 
+  geom_histogram(aes(price),fill = '#fd5c63',alpha = 0.85, binwidth = 10) +
+  theme_minimal(base_size = 15)+
+  xlab('Price')+
+  ylab('Number')+
+  xlim(0,500)+
+  ggtitle('The distribution of Price')
+```
+
+#### ΑΝΑΛΥΣΗ
+
+Να σημειωθεί ότι για την καλύτερη απεικόνιση των αποτελεσμάτων επιλέχτηκε το εύρος τιμών ανά διανυκτέρευση να περιοριστεί έως τα 500 δολάρια. Η επιλογή αυτή για απεικόνιση περιορισμένου εύρους τιμών είναι ασφαλής μιας και η πλειοψηφία των τιμών βρίσκεται στο εύρος αυτό.
+Στο ιστόγραμμα παρουσιάζεται η κατανομή της τιμής ανά διανυκτέρευση. Οι τιμές ανά διανυκτέρευση ξεκινάνε λίγο πάνω από το μηδέν και σε ελάχιστες περιπτώσεις ξεπερνάνε τα 500 δολάρια. Το γράφημα παρουσιάζει ότι το μεγαλύτερο ποσοστό των τιμών βρίσκεται στο εύρος μεταξύ 50 και 120 με 130 δολάρια. Παρατηρούνται φυσικά κάποιες κορυφές όπως είναι στις τιμές 160, 210 και 250 αλλά το μεγαλύτερο ποσοστό βρίσκεται στο προαναφερθέν εύρος.
+ 
+
+
+## 7. Mean Price in each Area
+```{r warning=FALSE}
+meanp = df%>%
+  group_by(neighbourhood_group)%>%
+  summarise(price = round(mean(price),2))
+meanp
+```
+
+#### ΑΝΑΛΥΣΗ
+
+Ανάλογα με την κάθε περιοχή υπολογίσθηκε και η μέση τιμή των ενοικίων. Οι πιο ακριβές περιοχές είναι το Manhattan και ακολουθεί το Brooklyn, και μάλιστα ο μέσος όρος των τιμών αυτών είναι σχεδόν στο μισό. Και αντίστοιχα οι πιο οικονομικές τιμές διανυκτέρευσης βρίσκονται στις περιοχές Bronx και Queens. 
+
+
+## 8. Relationship Number of Reviews - Price 
+```{r warning=FALSE}
+ggplot(df, aes(number_of_reviews, price))+
+  geom_point(aes(size = price),alpha = .05, 
+             color = 'slateblue')+
+  xlab('Number of reviews')+
+  ylab('Price')+
+  ggtitle('Relationship between number of reviews')
+```
+
+#### ΑΝΑΛΥΣΗ
+
+Στο γράφημα παρουσιάζεται η σχέση μεταξύ του αριθμού των σχολίων και της τιμής. Συγκεκριμένα, παρατηρείται ότι όσο λιγότερος είναι ο αριθμός των σχολίων τόσο υψηλότερη είναι και η τιμή ενός δωματίου.   
+
+
+## 9. 150 most expensive listings 
+```{r warning=FALSE}
+top_df = df %>% top_n(n = 150, wt = price)
+```
+
+## 10. 150 most cheap listings  
+```{r warning=FALSE}
+least_df = df %>% top_n(n = -150, wt = price)
+```
+
+## 11. Median Price by Neighborhood 
+```{r message=FALSE, warning=FALSE, paged.print=FALSE}
+med = df %>%
+  group_by(neighbourhood) %>%
+  summarise(num_listings = n(),
+            median_price = median(price),
+            long = median(longitude),
+            lat = median(latitude),
+            borough = unique(neighbourhood_group))
+```
+
+
+# MAPS 
+
+Η δημιουργία θεματικού χάρτη περιλαμβάνει την χρήση των δεδομένων που βρίσκονται στο αρχείο csv και την χαρτογράφηση της περιοχής της Νέας Υόρκης κάνοντας χρήση του αρχείου shapefile. 
+
+
+## SETTING A COORDINATE SYSTEM
+
+### Coordinate system for top listings / plot
+```{r warning=FALSE}
+coordinates(top_df) = c("longitude","latitude")
+crs.geo1 = CRS("+proj=longlat")  
+proj4string(top_df) = crs.geo1 
+
+plot(top_df,pch = 20, col = 'red')
+```
+
+#### AΝΑΛΥΣΗ
+Απιεκόνιση των πιο ακριβών καταχωρήσεων.
+
+
+### Coordinate system for least listings / plot
+```{r warning=FALSE}
+coordinates(least_df) = c("longitude","latitude")
+crs.geo1 = CRS("+proj=longlat")  
+proj4string(least_df) = crs.geo1 
+
+plot(least_df,pch = 20, col = 'purple')
+```
+
+#### ΑΝΑΛΥΣΗ
+Απεικόνιση των οικονομικότερων καταχωρήσεων.
+
+
+### Coordinate system for mean value / plot
+```{r warning=FALSE}
+coordinates(med) = c("long","lat")
+crs.geo1 = CRS("+proj=longlat")  
+proj4string(med) = crs.geo1 
+
+plot(med,pch = 20, col = 'blue')
+```
+
+## READ THE SHAPEFILE OF NEW YORK
+
+The shapefile is taken from the website [NYC OpenData](https://data.cityofnewyork.us/City-Government/Zoning-GIS-Data-Shapefile/kdig-pewd)
+
+```{r message=FALSE, warning=FALSE, paged.print=FALSE}
+p = readOGR('Zoning GIS Data_ Shapefile')
+plot(p)
+```
+
+## CREATE COLOURED MAPS
+
+### Create a coloured dot map of top 150 listings
+```{r message=FALSE, warning=FALSE, paged.print=FALSE}
+tm_shape(p) + tm_borders(alpha=.4)+
+  tm_shape(top_df)+
+  tm_dots(col = "price",
+          scale = 5,
+          palette = "Reds", 
+          style = "quantile",
+          title = ' Top Prices per Night ($)')+
+  tm_shape(least_df)+
+  tm_dots(col = "price",
+          scale = 5,
+          palette = "Greens", 
+          style = "quantile",
+          title = 'Least Prices per Night ($)')+
+  tm_compass()
+```
+
+#### ΑΝΑΛΥΣΗ
+
+Στον πρώτο θεματικό χάρτη που παρουσιάζεται, γίνεται προβολή των αποτελεσμάτων των ερωτήσεων 9 και 10, δηλαδή των κορυφαίων 150 καταχωρήσεις με βάση την τιμή τους και επίσης στον ίδιο χάρτη προβάλλονται οι 150 πιο οικονομικών καταχωρήσεων. Η πλειοψηφία των ακριβότερων καταχωρήσεων βρίσκεται στην περιοχή του Manhattan και ελάχιστες καταχωρήσεις στο δείγμα των 150 ακριβότερων καταχωρήσεων να βρίσκονται στην περιοχή του Brooklyn. Στον ίδιο χάρτη απεικονίζονται και οι 150 πιο οικονομικές καταχωρήσεις. Αρχικά, σε αντίθεση με τις ακριβότερες καταχωρήσεις οι οποίες είναι συγκεντρωμένες σε μια συγκεκριμένη περιοχή (Manhattan), οι οικονομικότερες καταχωρήσεις είναι διάσπαρτες ανάμεσα στο Manhattan και στο Brooklyn και σε μικρότερο βαθμό στις περιοχές Bronx και Queens.  
+
+
+### Create a coloured dot map of median price
+```{r warning=FALSE}
+tm_shape(p) + 
+  tm_borders(alpha=.4)+
+  tm_shape(med) + 
+  tm_dots(col = "median_price",
+          scale = 5,
+          palette = "Purples", 
+          style = "quantile",
+          title = 'Median Price ($)')+
+  tm_compass()
+```
+
+#### ΑΝΑΛΥΣΗ
+
+Στον δεύτερο θεματικό χάρτη, γίνεται προβολή της μέσης τιμής σε διάφορες περιοχές της Νέας Υόρκης. Νότιες γειτονιές του Manhattan όπως και οι βόρειες περιοχές του Brooklyn, αυτές δηλαδή που βρίσκονται κοντά στο Manhattan, παρουσιάζουν υψηλές μέσες τιμές. Επίσης, υπάρχουν γειτονιές στο Staten island που παρουσιάζουν εξίσου υψηλά ενοίκια. Γενικότερα, οι υπόλοιπες περιοχές της Νέας Υόρκης παρουσιάζουν χαμηλές μέσες τιμές ενοικίου. 
+
+
+### Create an interactive map
+```{r message=FALSE, warning=FALSE, paged.print=FALSE}
+df %>% 
+  mutate(popup = stri_c('Neighbourhood: ',  neighbourhood_group, '<br>',
+                  'Price:', price, '<br>',
+                  'Room Type: ', room_type, '<br>', 
+                  'Minimum Stay:', minimum_nights, '<br>',
+                  'Availability:', availability_365),
+                  'Latitude:', latitude,
+                  'Longitude:', longitude) %>% 
+  leaflet() %>%   addTiles() %>%
+  addMarkers(popup=~popup, clusterOptions = markerClusterOptions())
+```
+
+
+
